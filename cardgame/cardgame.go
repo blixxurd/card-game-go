@@ -134,9 +134,9 @@ func (g *Game) VerifyHands() (bool, []int) {
  * Returns a string representation of the Card.
  */
 func (c Card) String() string {
-	values := []string{"Ace", "2", "3", "4", "5", "6", "7", "8", "9", "10", "Jack", "Queen", "King"}
-	suits := []string{"Spades", "Hearts", "Diamonds", "Clubs"}
-	return fmt.Sprintf("%s of %s", values[c.Value-1], suits[c.Suit])
+	values := []string{"A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"}
+	suits := []string{"♠", "♥", "♦", "♣"}
+	return fmt.Sprintf("%s%s", values[c.Value-1], suits[c.Suit])
 }
 
 /**

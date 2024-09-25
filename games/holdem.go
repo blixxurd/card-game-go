@@ -135,20 +135,13 @@ func (g *HoldemGame) getComparisonValue(card cardgame.Card) int {
  */
 func (g *HoldemGame) PrintGameState() {
 	fmt.Println("Community cards:")
-	for _, card := range g.CommunityCards {
-		fmt.Println(card)
-	}
+	fmt.Printf("%v\n", g.CommunityCards)
 
 	for i, hand := range g.PlayerHands {
-		fmt.Printf("\nPlayer %d hole cards:\n", i+1)
-		for _, card := range hand.HoleCards {
-			fmt.Println(card)
-		}
+		fmt.Printf("\n\nPlayer %d:\n", i+1)
+		fmt.Printf("Hole cards: %s, %s\n", hand.HoleCards[0], hand.HoleCards[1])
 		fmt.Printf("Best hand: %s\n", hand.HandResult.Name)
-		fmt.Println("Cards in best hand:")
-		for _, card := range hand.HandResult.Cards {
-			fmt.Println(card)
-		}
+		fmt.Printf("%v\n", hand.HandResult.Cards)
 	}
 }
 

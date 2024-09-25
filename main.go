@@ -6,5 +6,5 @@ import (
 
 func main() {
 	// Run a simulation of a 2-player Texas Hold'em game
-	games.PlayHoldem(6)
+	games.PlayHoldem(2)
 }

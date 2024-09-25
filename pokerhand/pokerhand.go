@@ -259,13 +259,13 @@ func getHighCards(hand []cardgame.Card, count int) []int {
 func cardValueToString(value int) string {
 	switch value {
 	case 14:
-		return "Ace"
+		return "A"
 	case 13:
-		return "King"
+		return "K"
 	case 12:
-		return "Queen"
+		return "Q"
 	case 11:
-		return "Jack"
+		return "J"
 	default:
 		return fmt.Sprintf("%d", value)
 	}

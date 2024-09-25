@@ -1,0 +1,11 @@
+.
+├── README.md
+├── cardgame
+│   └── cardgame.go
+├── file-tree.txt
+├── go.mod
+├── main.go
+└── pokerhand
+    └── pokerhand.go
+
+3 directories, 6 files

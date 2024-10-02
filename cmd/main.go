@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/blixxurd/card-game-go/games"
+	"github.com/blixxurd/card-game-go/internal/games"
 )
 
 func main() {

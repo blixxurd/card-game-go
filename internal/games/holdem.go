@@ -3,8 +3,8 @@ package games
 import (
 	"fmt"
 
-	"github.com/blixxurd/card-game-go/cardgame"
-	"github.com/blixxurd/card-game-go/pokerhand"
+	"github.com/blixxurd/card-game-go/internal/cardgame"
+	"github.com/blixxurd/card-game-go/internal/pokerhand"
 )
 
 // MARK: Types

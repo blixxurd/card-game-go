@@ -5,7 +5,7 @@ import (
 	"log"
 	"sort"
 
-	"github.com/blixxurd/card-game-go/cardgame"
+	"github.com/blixxurd/card-game-go/internal/cardgame"
 )
 
 type HandRank int

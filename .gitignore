@@ -25,3 +25,6 @@
 # IDE specific files
 .idea/
 .vscode/
+
+# Generated file tree
+file-tree.txt

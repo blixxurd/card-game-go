@@ -1,28 +1,8 @@
 package cardgame
 
-import (
-	"fmt"
-	"math/rand"
-	"time"
-)
+import "errors"
 
 // MARK: Types
-type Suit int
-
-const (
-	Spades Suit = iota
-	Hearts
-	Diamonds
-	Clubs
-)
-
-type Card struct {
-	Suit  Suit
-	Value int
-}
-
-type Deck []Card
-
 type Hand []Card
 
 type Game struct {
@@ -32,15 +12,6 @@ type Game struct {
 }
 
 // MARK: Functions
-func NewDeck() Deck {
-	var deck Deck
-	for suit := Spades; suit <= Clubs; suit++ {
-		for value := 1; value <= 13; value++ {
-			deck = append(deck, Card{Suit: suit, Value: value})
-		}
-	}
-	return deck
-}
 
 /**
  * Creates a new CardGame with the specified number of hands.
@@ -60,34 +31,11 @@ func NewGame(numHands int) *Game {
 }
 
 /**
- * Shuffles the Deck.
- */
-func (d Deck) Shuffle() {
-	rand.Seed(time.Now().UnixNano())
-	rand.Shuffle(len(d), func(i, j int) {
-		d[i], d[j] = d[j], d[i]
-	})
-}
-
-/**
- * Draws a card from the Deck
- * This works by removing the first card from the slice and returning it.
- */
-func (d *Deck) Draw() (Card, error) {
-	if len(*d) == 0 {
-		return Card{}, fmt.Errorf("no cards left in the deck")
-	}
-	card := (*d)[0]
-	*d = (*d)[1:]
-	return card, nil
-}
-
-/**
  * Deals a card to the specified hand
  */
 func (g *Game) Deal(handIndex int) error {
 	if handIndex < 0 || handIndex >= len(g.Hands) {
-		return fmt.Errorf("invalid hand index")
+		return errors.New("no cards left in the deck")
 	}
 	card, err := g.Deck.Draw()
 	if err != nil {
@@ -128,24 +76,15 @@ func (g *Game) VerifyHands() (bool, []int) {
 	return len(invalidHandIndices) == 0, invalidHandIndices
 }
 
-// MARK: String Functions
+// MARK: Methods
 
 /**
- * Returns a string representation of the Card.
- */
-func (c Card) String() string {
-	values := []string{"A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"}
-	suits := []string{"♠", "♥", "♦", "♣"}
-	return fmt.Sprintf("%s%s", values[c.Value-1], suits[c.Suit])
-}
-
-/**
- * Returns a string representation of the Deck.
+ * Returns a string representation of the Hand.
  */
 func (h Hand) String() string {
 	result := ""
 	for _, card := range h {
-		result += card.String() + "\n"
+		result += card.String() + " "
 	}
 	return result
 }

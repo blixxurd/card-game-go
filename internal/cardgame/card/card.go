@@ -1,4 +1,4 @@
-package cardgame
+package card
 
 import (
 	"fmt"

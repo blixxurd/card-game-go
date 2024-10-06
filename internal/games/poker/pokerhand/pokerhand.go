@@ -5,7 +5,7 @@ import (
 	"log"
 	"sort"
 
-	"github.com/blixxurd/card-game-go/internal/cardgame"
+	"github.com/blixxurd/card-game-go/internal/cardgame/card"
 )
 
 type HandRank int
@@ -26,7 +26,7 @@ const (
 type HandResult struct {
 	Rank      HandRank
 	Name      string
-	Cards     []cardgame.Card
+	Cards     []card.Card
 	HighCards []int
 }
 
@@ -38,7 +38,7 @@ type HandResult struct {
  * containing the rank of the best hand, the name of the hand, the cards that
  * make up the hand, and the high cards used to break ties.
  */
-func EvaluateBestHand(cards []cardgame.Card) (HandResult, error) {
+func EvaluateBestHand(cards []card.Card) (HandResult, error) {
 	if len(cards) < 5 {
 		return HandResult{}, fmt.Errorf("not enough cards to evaluate hand")
 	}
@@ -70,8 +70,8 @@ func EvaluateBestHand(cards []cardgame.Card) (HandResult, error) {
  * the rank of the best hand, the name of the hand, the cards that make up the
  * hand, and the high cards used to break ties.
  */
-func evaluateHand(hand []cardgame.Card) HandResult {
-	sortedHand := make([]cardgame.Card, len(hand))
+func evaluateHand(hand []card.Card) HandResult {
+	sortedHand := make([]card.Card, len(hand))
 	copy(sortedHand, hand)
 	sort.Slice(sortedHand, func(i, j int) bool {
 		return getComparisonValue(sortedHand[i]) > getComparisonValue(sortedHand[j])
@@ -126,7 +126,7 @@ func evaluateHand(hand []cardgame.Card) HandResult {
  * Returns the comparison value of a card. The comparison value is the
  * card's value, except for an Ace, which is assigned a value of 14.
  */
-func getComparisonValue(card cardgame.Card) int {
+func getComparisonValue(card card.Card) int {
 	if card.Value == 1 { // Ace
 		return 14
 	}
@@ -136,7 +136,7 @@ func getComparisonValue(card cardgame.Card) int {
 /**
  * Checks if all cards in a hand have the same suit.
  */
-func checkFlush(hand []cardgame.Card) bool {
+func checkFlush(hand []card.Card) bool {
 	suit := hand[0].Suit
 	for _, card := range hand[1:] {
 		if card.Suit != suit {
@@ -151,7 +151,7 @@ func checkFlush(hand []cardgame.Card) bool {
  * have consecutive values. The function also checks for an Ace-low straight
  * ie. A, 2, 3, 4, 5.
  */
-func checkStraight(hand []cardgame.Card) (bool, int) {
+func checkStraight(hand []card.Card) (bool, int) {
 	values := make([]int, len(hand))
 	for i, card := range hand {
 		values[i] = getComparisonValue(card)
@@ -181,7 +181,7 @@ func checkStraight(hand []cardgame.Card) (bool, int) {
 /**
  * Counts the number of cards with the same value in a hand.
  */
-func countValues(hand []cardgame.Card) map[int]int {
+func countValues(hand []card.Card) map[int]int {
 	counts := make(map[int]int)
 	for _, card := range hand {
 		counts[getComparisonValue(card)]++
@@ -245,7 +245,7 @@ func countPairs(counts map[int]int) int {
  * Returns the high cards in a hand. The number of high cards returned
  * is specified by the count parameter.
  */
-func getHighCards(hand []cardgame.Card, count int) []int {
+func getHighCards(hand []card.Card, count int) []int {
 	highCards := make([]int, 0, count)
 	for i := 0; i < count && i < len(hand); i++ {
 		highCards = append(highCards, getComparisonValue(hand[i]))
@@ -299,14 +299,14 @@ func CompareHands(hand1, hand2 HandResult) int {
  * This method is used to generate all possible 5-card hands from a set of
  * cards.
  */
-func generateCombinations(cards []cardgame.Card, k int) [][]cardgame.Card {
-	var combos [][]cardgame.Card
-	var combo []cardgame.Card
+func generateCombinations(cards []card.Card, k int) [][]card.Card {
+	var combos [][]card.Card
+	var combo []card.Card
 	var generate func(int, int)
 
 	generate = func(start, k int) {
 		if k == 0 {
-			temp := make([]cardgame.Card, len(combo))
+			temp := make([]card.Card, len(combo))
 			copy(temp, combo)
 			combos = append(combos, temp)
 			return

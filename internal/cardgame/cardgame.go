@@ -1,14 +1,19 @@
 package cardgame
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/blixxurd/card-game-go/internal/cardgame/card"
+	"github.com/blixxurd/card-game-go/internal/cardgame/deck"
+)
 
 // MARK: Types
-type Hand []Card
+type Hand []card.Card
 
 type Game struct {
-	Deck          Deck
+	Deck          deck.Deck
 	Hands         []Hand
-	ReferenceDeck Deck // Full copy of the original deck for verification
+	ReferenceDeck deck.Deck // Full copy of the original deck for verification
 }
 
 // MARK: Functions
@@ -17,12 +22,12 @@ type Game struct {
  * Creates a new CardGame with the specified number of hands.
  */
 func NewGame(numHands int) *Game {
-	deck := NewDeck()
-	referenceDeck := make(Deck, len(deck))
-	copy(referenceDeck, deck)
+	newDeck := deck.NewDeck()
+	referenceDeck := make(deck.Deck, len(newDeck))
+	copy(referenceDeck, newDeck)
 
 	game := &Game{
-		Deck:          deck,
+		Deck:          newDeck,
 		Hands:         make([]Hand, numHands),
 		ReferenceDeck: referenceDeck,
 	}
@@ -50,7 +55,7 @@ func (g *Game) Deal(handIndex int) error {
  * Returns true if all hands are valid, along with a slice of indices of invalid hands.
  */
 func (g *Game) VerifyHands() (bool, []int) {
-	deckCopy := make(Deck, len(g.ReferenceDeck))
+	deckCopy := make(deck.Deck, len(g.ReferenceDeck))
 	copy(deckCopy, g.ReferenceDeck)
 
 	invalidHandIndices := []int{}

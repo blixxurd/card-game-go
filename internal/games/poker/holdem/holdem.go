@@ -1,22 +1,23 @@
-package games
+package holdem
 
 import (
 	"fmt"
 
 	"github.com/blixxurd/card-game-go/internal/cardgame"
-	"github.com/blixxurd/card-game-go/internal/pokerhand"
+	"github.com/blixxurd/card-game-go/internal/cardgame/card"
+	"github.com/blixxurd/card-game-go/internal/games/poker/pokerhand"
 )
 
 // MARK: Types
 type PlayerHand struct {
 	Player     int
-	HoleCards  []cardgame.Card
+	HoleCards  []card.Card
 	HandResult pokerhand.HandResult
 }
 
 type HoldemGame struct {
 	Game           *cardgame.Game
-	CommunityCards []cardgame.Card
+	CommunityCards []card.Card
 	PlayerHands    []PlayerHand
 	NumPlayers     int
 }
@@ -26,10 +27,10 @@ type HoldemGame struct {
 /**
  * Creates a new HoldemGame with the specified number of players.
  */
-func NewHoldemGame(numPlayers int) *HoldemGame {
+func NewGame(numPlayers int) *HoldemGame {
 	return &HoldemGame{
 		Game:           cardgame.NewGame(numPlayers),
-		CommunityCards: make([]cardgame.Card, 0, 5),
+		CommunityCards: make([]card.Card, 0, 5),
 		PlayerHands:    make([]PlayerHand, numPlayers),
 		NumPlayers:     numPlayers,
 	}
@@ -123,7 +124,7 @@ func (g *HoldemGame) breakTie(hand1, hand2 PlayerHand) PlayerHand {
  * The comparison value is the card value, with the exception
  * of the Ace, which is assigned a value of 14 for comparison purposes.
  */
-func (g *HoldemGame) getComparisonValue(card cardgame.Card) int {
+func (g *HoldemGame) getComparisonValue(card card.Card) int {
 	if card.Value == 1 { // Ace
 		return 14
 	}
@@ -149,7 +150,7 @@ func (g *HoldemGame) PrintGameState() {
  * Runs a simulation of a Texas Hold'em game with the specified number of players.
  */
 func PlayHoldem(numPlayers int) {
-	game := NewHoldemGame(numPlayers)
+	game := NewGame(numPlayers)
 
 	err := game.DealHoleCards()
 	if err != nil {

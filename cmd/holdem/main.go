@@ -148,7 +148,7 @@ func main() {
 	fmt.Printf("Current player: %s\n", game.CurrentPlayer().Name())
 	fmt.Printf("Game state: %s\n", game.State())
 
-	// Simulate the game
+	// Simulate some actions
 	simulateGame(game)
 }
 

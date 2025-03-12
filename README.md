@@ -7,8 +7,8 @@ This project implements a flexible and composable card game framework with a pri
 - Robust deck and hand management
 - Comprehensive poker hand evaluation
 - Texas Hold'em game simulation
-- Basics of a WebSocket module intentded for future online play
 - Flexible architecture for easy extension to other card games
+- Clean separation of concerns with well-defined interfaces
 
 ## Project Goals
 
@@ -20,10 +20,14 @@ This project implements a flexible and composable card game framework with a pri
 ## Structure
 
 - `cmd/main.go`: Main application demonstrating the use of the framework (Currently runs a holdem simulation)
-- `internal/cardgame/`: Package containing core card game logic (cards, decks, game management)
-- `internal/pokerhand/`: Package for poker hand evaluation
-- `internal/games/`: Package for specific game implementations (currently Texas Hold'em)
-- `internal/net/`: Package for networking capabilities (WebSocket implementation)
+- `pkg/cardgame/`: Package containing core card game interfaces and implementations
+  - `card/`: Card interfaces and implementations
+  - `deck/`: Deck interfaces and implementations
+  - `hand/`: Hand interfaces and implementations
+  - `player/`: Player interfaces and implementations
+  - `poker/`: Poker-specific implementations
+    - `pokerhand/`: Poker hand evaluation
+    - `holdem/`: Texas Hold'em game implementation
 
 ## Usage
 
@@ -53,7 +57,16 @@ To run this project, follow these steps:
 - Hand dealing and verification
 - Poker hand evaluation (including games with community cards)
 - Texas Hold'em game simulation
-- WebSocket infrastructure for potential online play
+- Well-defined interfaces for extending to other card games
+
+## Architecture
+
+The project follows a clean architecture approach with:
+
+- Clear separation between interfaces and implementations
+- Domain-driven design principles
+- Composition over inheritance
+- Dependency injection for flexible component wiring
 
 ## Future Directions
 
@@ -61,3 +74,4 @@ To run this project, follow these steps:
 - Expand to other card games (e.g., Blackjack, Bridge)
 - Develop a full-fledged online multiplayer system
 - Create a CLI or GUI for interactive gameplay
+- Add comprehensive unit tests for all components

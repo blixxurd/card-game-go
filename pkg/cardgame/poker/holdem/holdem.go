@@ -12,6 +12,7 @@ import (
 	"github.com/blixxurd/card-game-go/pkg/cardgame/hand"
 	"github.com/blixxurd/card-game-go/pkg/cardgame/player"
 	"github.com/blixxurd/card-game-go/pkg/cardgame/poker/pokerhand"
+	"github.com/blixxurd/card-game-go/pkg/cardgame/table"
 )
 
 // GameState represents the state of a Texas Hold'em game
@@ -107,10 +108,16 @@ type HoldemGame struct {
 	winners          []player.Player
 	mutex            sync.RWMutex
 	customData       map[string]interface{}
+
+	// New field for the Table entity
+	table *table.Table
 }
 
 // NewHoldemGame creates a new HoldemGame
 func NewHoldemGame(id, name string, smallBlind, bigBlind int) *HoldemGame {
+	// Create a new table with 9 seats (standard poker table)
+	pokerTable := table.NewTable(9, smallBlind, bigBlind, 100, 10000, table.NoLimit)
+
 	return &HoldemGame{
 		id:               id,
 		name:             name,
@@ -126,6 +133,7 @@ func NewHoldemGame(id, name string, smallBlind, bigBlind int) *HoldemGame {
 		pot:              0,
 		winners:          make([]player.Player, 0),
 		customData:       make(map[string]interface{}),
+		table:            pokerTable,
 	}
 }
 
@@ -178,6 +186,25 @@ func (g *HoldemGame) Start() error {
 		g.activePlayers[p.ID()] = true
 	}
 
+	// Start a new hand on the table
+	g.table.StartNewHand()
+
+	// Activate all occupied seats
+	for _, seat := range g.table.Seats {
+		if seat.IsOccupied {
+			seat.IsActive = true
+		}
+	}
+
+	// Collect blinds
+	err := g.table.CollectBlinds()
+	if err != nil {
+		return fmt.Errorf("failed to collect blinds: %w", err)
+	}
+
+	// Update the pot from the table (for backward compatibility)
+	g.pot = g.table.GetTotalPot()
+
 	// Deal hole cards to each player
 	g.dealHoleCards()
 
@@ -187,8 +214,13 @@ func (g *HoldemGame) Start() error {
 	return nil
 }
 
-// AddPlayer adds a player to the game
+// AddPlayer adds a player to the game with a default chip stack of 1000
 func (g *HoldemGame) AddPlayer(p player.Player) error {
+	return g.AddPlayerWithChips(p, 1000)
+}
+
+// AddPlayerWithChips adds a player to the game with a specified chip stack
+func (g *HoldemGame) AddPlayerWithChips(p player.Player, chipStack int) error {
 	g.mutex.Lock()
 	defer g.mutex.Unlock()
 
@@ -203,7 +235,28 @@ func (g *HoldemGame) AddPlayer(p player.Player) error {
 		}
 	}
 
+	// Add player to the game's player list (for backward compatibility)
 	g.players = append(g.players, p)
+
+	// Find an empty seat at the table
+	for i := 0; i < len(g.table.Seats); i++ {
+		seat, err := g.table.GetSeat(i)
+		if err != nil {
+			continue
+		}
+
+		if !seat.IsOccupied {
+			// Add player to the table with the specified chip stack
+			err := g.table.AddPlayer(p, i, chipStack)
+			if err != nil {
+				// If there's an error adding to the table, remove from players list
+				g.players = g.players[:len(g.players)-1]
+				return fmt.Errorf("failed to add player to table: %w", err)
+			}
+			break
+		}
+	}
+
 	return nil
 }
 
@@ -216,14 +269,30 @@ func (g *HoldemGame) RemovePlayer(playerID string) error {
 		return errors.New("cannot remove player after game has started")
 	}
 
+	// Remove player from the game's player list
+	playerIndex := -1
 	for i, p := range g.players {
 		if p.ID() == playerID {
-			g.players = append(g.players[:i], g.players[i+1:]...)
-			return nil
+			playerIndex = i
+			break
 		}
 	}
 
-	return errors.New("player not found")
+	if playerIndex >= 0 {
+		g.players = append(g.players[:playerIndex], g.players[playerIndex+1:]...)
+	} else {
+		return errors.New("player not found")
+	}
+
+	// Remove player from the table
+	err := g.table.RemovePlayer(playerID)
+	if err != nil {
+		// If there's an error removing from the table, but we've already removed from players list,
+		// we should log this but not fail the operation
+		fmt.Printf("Warning: Failed to remove player from table: %v\n", err)
+	}
+
+	return nil
 }
 
 // Players returns the players in the game
@@ -324,18 +393,126 @@ func (g *HoldemGame) ProcessAction(action game.Action) error {
 		return errors.New("invalid action type")
 	}
 
+	// Find the player's seat at the table
+	var playerSeat *table.Seat
+	var playerSeatPosition int
+	var err error
+
+	for i, seat := range g.table.Seats {
+		if seat.IsOccupied && seat.Player.ID() == holdemAction.playerID {
+			playerSeat = seat
+			playerSeatPosition = i
+			break
+		}
+	}
+
+	if playerSeat == nil {
+		return errors.New("player not found at table")
+	}
+
+	// Get the current bet amount that the player needs to call
+	currentBet := g.table.CurrentBet
+
+	// Get the player's current bet in this round
+	playerCurrentBet := playerSeat.CurrentBet
+
+	// Calculate how much more the player needs to call
+	callAmount := currentBet - playerCurrentBet
+
 	switch holdemAction.actionType {
 	case ActionCheck:
+		// Check is only valid if there's no bet to call
+		if callAmount > 0 {
+			return errors.New("cannot check when there's a bet to call")
+		}
 		// No action needed for check
-	case ActionBet:
-		g.pot += holdemAction.amount
 	case ActionCall:
-		g.pot += holdemAction.amount
+		// Call matches the current bet
+		betAmount := callAmount
+
+		// Use the table to place the bet
+		amount, isAllIn, err := g.table.PlaceBet(playerSeatPosition, betAmount)
+		if err != nil {
+			return fmt.Errorf("failed to place bet: %w", err)
+		}
+
+		// Update the pot from the table (for backward compatibility)
+		g.pot = g.table.GetTotalPot()
+
+		// If the player went all-in with a call, it might create a side pot
+		if isAllIn && amount < betAmount {
+			// The player couldn't match the full bet amount, so they're all-in for less
+			// This is handled by the Table's PlaceBet method, which creates a side pot
+			g.SetData("last_action", fmt.Sprintf("Player %s called %d and is all-in", holdemAction.playerID, amount))
+		} else {
+			g.SetData("last_action", fmt.Sprintf("Player %s called %d", holdemAction.playerID, amount))
+		}
+	case ActionBet:
+		// Bet is only valid if there's no bet to call
+		if callAmount > 0 {
+			return errors.New("cannot bet when there's a bet to call")
+		}
+
+		// Validate minimum bet
+		minBet := g.table.GetMinRaise()
+		if holdemAction.amount < minBet {
+			return fmt.Errorf("bet must be at least %d", minBet)
+		}
+
+		// Use the table to place the bet
+		amount, isAllIn, err := g.table.PlaceBet(playerSeatPosition, holdemAction.amount)
+		if err != nil {
+			return fmt.Errorf("failed to place bet: %w", err)
+		}
+
+		// Update the pot from the table (for backward compatibility)
+		g.pot = g.table.GetTotalPot()
+
+		if isAllIn {
+			g.SetData("last_action", fmt.Sprintf("Player %s bet %d and is all-in", holdemAction.playerID, amount))
+		} else {
+			g.SetData("last_action", fmt.Sprintf("Player %s bet %d", holdemAction.playerID, amount))
+		}
 	case ActionRaise:
-		g.pot += holdemAction.amount
+		// Raise is only valid if there's a bet to call
+		if callAmount <= 0 {
+			return errors.New("cannot raise when there's no bet to call")
+		}
+
+		// Calculate the total amount (call + raise)
+		totalAmount := callAmount + holdemAction.amount
+
+		// Validate minimum raise
+		minRaise := g.table.GetMinRaise()
+		if holdemAction.amount < minRaise {
+			return fmt.Errorf("raise must be at least %d", minRaise)
+		}
+
+		// Use the table to place the bet
+		amount, isAllIn, err := g.table.PlaceBet(playerSeatPosition, totalAmount)
+		if err != nil {
+			return fmt.Errorf("failed to place bet: %w", err)
+		}
+
+		// Update the pot from the table (for backward compatibility)
+		g.pot = g.table.GetTotalPot()
+
+		if isAllIn {
+			g.SetData("last_action", fmt.Sprintf("Player %s raised to %d and is all-in", holdemAction.playerID, amount))
+		} else {
+			g.SetData("last_action", fmt.Sprintf("Player %s raised to %d", holdemAction.playerID, amount))
+		}
 	case ActionFold:
-		// Mark the player as inactive
+		// Use the table to fold the player
+		err = g.table.FoldPlayer(playerSeatPosition)
+		if err != nil {
+			return fmt.Errorf("failed to fold player: %w", err)
+		}
+
+		// Mark the player as inactive (for backward compatibility)
 		g.activePlayers[holdemAction.playerID] = false
+
+		g.SetData("last_action", fmt.Sprintf("Player %s folded", holdemAction.playerID))
 
 		// Check if there's only one active player left
 		activeCount := 0
@@ -352,6 +529,25 @@ func (g *HoldemGame) ProcessAction(action game.Action) error {
 		if activeCount == 1 {
 			g.winners = []player.Player{lastActivePlayer}
 			g.state = StateComplete
+
+			// Award the pot to the winner
+			winners := map[int]string{
+				-1: lastActivePlayer.ID(), // Main pot goes to the last active player
+			}
+
+			// Award side pots if they exist
+			for i := range g.table.PotManager.SidePots {
+				// Check if the winner is eligible for this side pot
+				if g.table.PotManager.SidePots[i].IsPlayerEligible(lastActivePlayer.ID()) {
+					winners[i] = lastActivePlayer.ID()
+				}
+			}
+
+			g.table.AwardPotsToWinners(winners)
+
+			g.SetData("winner", lastActivePlayer.ID())
+			g.SetData("win_type", "last_player_standing")
+
 			return nil
 		}
 
@@ -368,13 +564,56 @@ func (g *HoldemGame) ProcessAction(action game.Action) error {
 	// Move to the next player
 	g.currentPlayerIdx = (g.currentPlayerIdx + 1) % len(g.players)
 
-	// Skip players who have folded
-	for !g.activePlayers[g.players[g.currentPlayerIdx].ID()] && g.state != StateComplete {
+	// Skip players who have folded or are all-in
+	for (!g.activePlayers[g.players[g.currentPlayerIdx].ID()] || g.isPlayerAllIn(g.players[g.currentPlayerIdx].ID())) && g.state != StateComplete {
 		g.currentPlayerIdx = (g.currentPlayerIdx + 1) % len(g.players)
+
+		// If we've gone all the way around and everyone is either folded or all-in,
+		// we need to deal the remaining community cards and go to showdown
+		if g.currentPlayerIdx == 0 {
+			// Deal remaining community cards
+			switch g.state {
+			case StatePreFlop:
+				g.DealFlop()
+				g.DealTurn()
+				g.DealRiver()
+				g.evaluateHands()
+				g.state = StateShowdown
+				g.awardPotsToWinners()
+				g.state = StateComplete
+				return nil
+			case StateFlop:
+				g.DealTurn()
+				g.DealRiver()
+				g.evaluateHands()
+				g.state = StateShowdown
+				g.awardPotsToWinners()
+				g.state = StateComplete
+				return nil
+			case StateTurn:
+				g.DealRiver()
+				g.evaluateHands()
+				g.state = StateShowdown
+				g.awardPotsToWinners()
+				g.state = StateComplete
+				return nil
+			case StateRiver:
+				g.evaluateHands()
+				g.state = StateShowdown
+				g.awardPotsToWinners()
+				g.state = StateComplete
+				return nil
+			}
+		}
 	}
 
 	// Check if we've completed a round (all players have acted)
-	if g.currentPlayerIdx == 0 {
+	// This happens when we return to the first player who still needs to act
+	// or when everyone has either folded or gone all-in
+	if g.hasRoundCompleted() {
+		// Start a new betting round on the table
+		g.table.StartNewBettingRound()
+
 		// Advance the game state
 		switch g.state {
 		case StatePreFlop:
@@ -389,7 +628,7 @@ func (g *HoldemGame) ProcessAction(action game.Action) error {
 		case StateRiver:
 			g.evaluateHands()
 			g.state = StateShowdown
-		case StateShowdown:
+			g.awardPotsToWinners()
 			g.state = StateComplete
 		}
 	}
@@ -476,6 +715,23 @@ func (g *HoldemGame) Reset() error {
 	g.activePlayers = make(map[string]bool)
 	g.pot = 0
 	g.winners = make([]player.Player, 0)
+
+	// Reset the table for a new hand
+	// We don't use StartNewHand here because that would advance the dealer button
+	// and we want to keep the same dealer position for the next hand
+	for _, seat := range g.table.Seats {
+		if seat.IsOccupied {
+			seat.Reset()
+		}
+	}
+
+	// Reset the pot manager
+	g.table.PotManager.Reset()
+
+	// Reset betting state
+	g.table.CurrentBettingRound = 0
+	g.table.CurrentBet = 0
+	g.table.LastRaiseAmount = 0
 
 	return nil
 }
@@ -641,4 +897,93 @@ func (g *HoldemGame) evaluateHands() {
 // String returns a string representation of the game
 func (g *HoldemGame) String() string {
 	return fmt.Sprintf("HoldemGame{id: %s, name: %s, state: %s, players: %d}", g.id, g.name, g.state, len(g.players))
+}
+
+// isPlayerAllIn checks if a player is all-in
+func (g *HoldemGame) isPlayerAllIn(playerID string) bool {
+	for _, seat := range g.table.Seats {
+		if seat.IsOccupied && seat.Player.ID() == playerID {
+			return seat.IsAllIn
+		}
+	}
+	return false
+}
+
+// hasRoundCompleted checks if the current betting round has completed
+func (g *HoldemGame) hasRoundCompleted() bool {
+	// If we're back to the first player who still needs to act, the round is complete
+	if g.currentPlayerIdx == 0 {
+		return true
+	}
+
+	// Count active players who aren't all-in
+	activePlayersNotAllIn := 0
+	for _, p := range g.players {
+		if g.activePlayers[p.ID()] && !g.isPlayerAllIn(p.ID()) {
+			activePlayersNotAllIn++
+		}
+	}
+
+	// If there are fewer than 2 active players who aren't all-in, the round is complete
+	if activePlayersNotAllIn < 2 {
+		return true
+	}
+
+	// Check if all active players have bet the same amount or are all-in
+	currentBet := g.table.CurrentBet
+	for _, seat := range g.table.Seats {
+		if seat.IsOccupied && seat.IsActive && !seat.HasFolded && !seat.IsAllIn {
+			if seat.CurrentBet != currentBet {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+// awardPotsToWinners awards the pots to the winners based on hand evaluation
+func (g *HoldemGame) awardPotsToWinners() {
+	if len(g.winners) == 0 {
+		return
+	}
+
+	// Create a map to track which pots each winner is eligible for
+	winners := make(map[int][]string)
+
+	// Award main pot
+	// If there are multiple winners, they split the main pot
+	mainPotWinners := make([]string, 0, len(g.winners))
+	for _, winner := range g.winners {
+		mainPotWinners = append(mainPotWinners, winner.ID())
+	}
+	winners[-1] = mainPotWinners
+
+	if len(mainPotWinners) > 1 {
+		g.SetData("split_pot", true)
+	}
+
+	// Award side pots
+	// For each side pot, determine which winners are eligible
+	for i, sidePot := range g.table.PotManager.SidePots {
+		sidePotWinners := make([]string, 0)
+		for _, winner := range g.winners {
+			if sidePot.IsPlayerEligible(winner.ID()) {
+				sidePotWinners = append(sidePotWinners, winner.ID())
+			}
+		}
+		if len(sidePotWinners) > 0 {
+			winners[i] = sidePotWinners
+		}
+	}
+
+	// Award the pots to the winners
+	g.table.AwardPotsToMultipleWinners(winners)
+
+	// Store the winners in game data
+	winnerIDs := make([]string, 0, len(g.winners))
+	for _, w := range g.winners {
+		winnerIDs = append(winnerIDs, w.ID())
+	}
+	g.SetData("winners", winnerIDs)
 }

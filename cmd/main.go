@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
+	"time"
 
 	"github.com/blixxurd/card-game-go/pkg/cardgame/card"
 	"github.com/blixxurd/card-game-go/pkg/cardgame/hand"
@@ -18,6 +20,7 @@ type SimplePlayer struct {
 	active   bool
 	hand     hand.Hand
 	userData map[string]interface{}
+	chips    int
 }
 
 // ID returns the player's ID
@@ -93,6 +96,7 @@ func (p *SimplePlayer) Clone() player.Player {
 		name:     p.name,
 		score:    p.score,
 		active:   p.active,
+		chips:    p.chips,
 		userData: make(map[string]interface{}),
 	}
 
@@ -111,6 +115,9 @@ func (p *SimplePlayer) Clone() player.Player {
 }
 
 func main() {
+	// Seed the random number generator
+	rand.Seed(time.Now().UnixNano())
+
 	// Create a new Texas Hold'em game
 	game := holdem.NewHoldemGame("game1", "Texas Hold'em", 5, 10)
 
@@ -121,12 +128,13 @@ func main() {
 		return
 	}
 
-	// Add players
+	// Add players with starting chips
 	for i := 1; i <= 4; i++ {
 		player := &SimplePlayer{
 			id:     fmt.Sprintf("player%d", i),
 			name:   fmt.Sprintf("Player %d", i),
 			active: true,
+			chips:  1000, // Starting with 1000 chips
 		}
 		err := game.AddPlayer(player)
 		if err != nil {
@@ -143,16 +151,17 @@ func main() {
 	}
 
 	// Print the initial state
+	fmt.Println("===== TEXAS HOLD'EM POKER SIMULATION =====")
 	fmt.Println("Game started!")
 	fmt.Printf("Players: %d\n", len(game.Players()))
 	fmt.Printf("Current player: %s\n", game.CurrentPlayer().Name())
 	fmt.Printf("Game state: %s\n", game.State())
 
 	// Simulate the game
-	simulateGame(game)
+	simulateSimplePokerGame(game)
 }
 
-func simulateGame(game *holdem.HoldemGame) {
+func simulateSimplePokerGame(game *holdem.HoldemGame) {
 	// Get the players' hands
 	playerHands := make(map[string][]card.Card)
 	for _, p := range game.Players() {
@@ -163,69 +172,209 @@ func simulateGame(game *holdem.HoldemGame) {
 	}
 
 	// Print the players' hands
-	fmt.Println("\nPlayer hands:")
+	fmt.Println("\n===== PLAYER HANDS =====")
 	for _, p := range game.Players() {
 		cards := playerHands[p.ID()]
 		fmt.Printf("%s: %v\n", p.Name(), cards)
 	}
 
-	// Simulate the flop, turn, and river
-	fmt.Println("\nSimulating the game...")
-
-	// Simulate all players checking
-	for i := 0; i < len(game.Players()); i++ {
-		currentPlayer := game.CurrentPlayer()
-		fmt.Printf("%s checks\n", currentPlayer.Name())
-
-		action := holdem.NewHoldemAction(holdem.ActionCheck, currentPlayer.ID(), 0)
-		err := game.ProcessAction(action)
-		if err != nil {
-			fmt.Printf("Error processing action: %v\n", err)
-			return
-		}
+	// Track active players and pot
+	activePlayers := make(map[string]bool)
+	for _, p := range game.Players() {
+		activePlayers[p.ID()] = true
 	}
+	potSize := 0
 
-	// Print the flop
-	fmt.Println("\nFlop:")
+	// Simulate pre-flop betting (simplified)
+	fmt.Println("\n===== PRE-FLOP BETTING =====")
+	simulateSimpleBetting(game, &potSize, activePlayers)
+
+	// Deal flop
+	fmt.Println("\n===== FLOP =====")
+	game.DealFlop()
 	printCommunityCards(game)
 
-	// Simulate all players checking again
-	for i := 0; i < len(game.Players()); i++ {
-		currentPlayer := game.CurrentPlayer()
-		fmt.Printf("%s checks\n", currentPlayer.Name())
+	// Simulate flop betting (simplified)
+	fmt.Println("\n===== FLOP BETTING =====")
+	simulateSimpleBetting(game, &potSize, activePlayers)
 
-		action := holdem.NewHoldemAction(holdem.ActionCheck, currentPlayer.ID(), 0)
-		err := game.ProcessAction(action)
-		if err != nil {
-			fmt.Printf("Error processing action: %v\n", err)
-			return
-		}
-	}
-
-	// Print the turn
-	fmt.Println("\nTurn:")
+	// Deal turn
+	fmt.Println("\n===== TURN =====")
+	game.DealTurn()
 	printCommunityCards(game)
 
-	// Simulate all players checking again
-	for i := 0; i < len(game.Players()); i++ {
-		currentPlayer := game.CurrentPlayer()
-		fmt.Printf("%s checks\n", currentPlayer.Name())
+	// Simulate turn betting (simplified)
+	fmt.Println("\n===== TURN BETTING =====")
+	simulateSimpleBetting(game, &potSize, activePlayers)
 
-		action := holdem.NewHoldemAction(holdem.ActionCheck, currentPlayer.ID(), 0)
-		err := game.ProcessAction(action)
-		if err != nil {
-			fmt.Printf("Error processing action: %v\n", err)
-			return
+	// Deal river
+	fmt.Println("\n===== RIVER =====")
+	game.DealRiver()
+	printCommunityCards(game)
+
+	// Simulate river betting (simplified)
+	fmt.Println("\n===== RIVER BETTING =====")
+	simulateSimpleBetting(game, &potSize, activePlayers)
+
+	// Print final state
+	fmt.Println("\n===== GAME SUMMARY =====")
+	fmt.Printf("Final pot size: %d chips\n", potSize)
+
+	// Print final community cards
+	fmt.Println("\nFinal community cards:")
+	printCommunityCards(game)
+
+	// Print active players
+	fmt.Println("\nPlayers still in the hand:")
+	for _, p := range game.Players() {
+		if activePlayers[p.ID()] {
+			fmt.Printf("%s: %v\n", p.Name(), playerHands[p.ID()])
 		}
 	}
-
-	// Print the river
-	fmt.Println("\nRiver:")
-	printCommunityCards(game)
 
 	// Evaluate hands
-	fmt.Println("\nEvaluating hands...")
-	evaluateHands(game, playerHands)
+	communityCardsData, ok := game.Data()["community_cards"]
+	if ok {
+		communityCards, ok := communityCardsData.([]card.Card)
+		if ok && len(communityCards) > 0 {
+			fmt.Println("\n===== HAND EVALUATION =====")
+
+			// Evaluate active players' hands
+			results := make(map[string]pokerhand.HandResult)
+			for playerID, active := range activePlayers {
+				if active {
+					// Get player's cards
+					playerCards := playerHands[playerID]
+
+					// Combine with community cards
+					allCards := append(playerCards, communityCards...)
+
+					// Evaluate hand
+					result := pokerhand.EvaluateHand(allCards)
+					results[playerID] = result
+
+					// Print result
+					player := findPlayer(game, playerID)
+					fmt.Printf("%s: %s\n", player.Name(), result.Description)
+				}
+			}
+
+			// Determine winner
+			var bestPlayerID string
+			var bestResult pokerhand.HandResult
+
+			for playerID, result := range results {
+				if bestPlayerID == "" || pokerhand.CompareHands(result, bestResult) > 0 {
+					bestPlayerID = playerID
+					bestResult = result
+				}
+			}
+
+			// Print winner
+			if bestPlayerID != "" {
+				winner := findPlayer(game, bestPlayerID)
+				fmt.Printf("\n🏆 WINNER: %s with %s 🏆\n", winner.Name(), bestResult.Description)
+				fmt.Printf("%s wins %d chips!\n", winner.Name(), potSize)
+			}
+		}
+	}
+}
+
+// simulateSimpleBetting simulates a simplified betting round
+func simulateSimpleBetting(game *holdem.HoldemGame, potSize *int, activePlayers map[string]bool) {
+	// Randomly decide which players fold
+	for _, p := range game.Players() {
+		if activePlayers[p.ID()] {
+			// 25% chance to fold
+			if rand.Float64() < 0.25 {
+				fmt.Printf("%s folds\n", p.Name())
+				activePlayers[p.ID()] = false
+			} else {
+				// Random bet between 10 and 50
+				bet := 10 + rand.Intn(41)
+				fmt.Printf("%s bets %d\n", p.Name(), bet)
+				*potSize += bet
+			}
+		}
+	}
+
+	// Count active players
+	activeCount := 0
+	for _, active := range activePlayers {
+		if active {
+			activeCount++
+		}
+	}
+
+	fmt.Printf("Betting round complete. %d players still active. Current pot: %d chips\n",
+		activeCount, *potSize)
+}
+
+// SimpleCard is a simple implementation of the Card interface
+type SimpleCard struct {
+	rank string
+	suit string
+}
+
+// ID returns a unique identifier for the card
+func (c *SimpleCard) ID() string {
+	return c.String()
+}
+
+// Name returns a human-readable name for the card
+func (c *SimpleCard) Name() string {
+	return c.String()
+}
+
+func (c *SimpleCard) String() string {
+	return c.rank + c.suit
+}
+
+// Equal checks if two cards are equivalent
+func (c *SimpleCard) Equal(other card.Card) bool {
+	return c.String() == other.String()
+}
+
+func (c *SimpleCard) Value() int {
+	// Convert rank to value
+	switch c.rank {
+	case "2":
+		return 2
+	case "3":
+		return 3
+	case "4":
+		return 4
+	case "5":
+		return 5
+	case "6":
+		return 6
+	case "7":
+		return 7
+	case "8":
+		return 8
+	case "9":
+		return 9
+	case "10":
+		return 10
+	case "J":
+		return 11
+	case "Q":
+		return 12
+	case "K":
+		return 13
+	case "A":
+		return 14
+	default:
+		return 0
+	}
+}
+
+// Clone returns a copy of the card
+func (c *SimpleCard) Clone() card.Card {
+	return &SimpleCard{
+		rank: c.rank,
+		suit: c.suit,
+	}
 }
 
 func printCommunityCards(game *holdem.HoldemGame) {
@@ -242,43 +391,16 @@ func printCommunityCards(game *holdem.HoldemGame) {
 		return
 	}
 
+	if len(communityCards) == 0 {
+		fmt.Println("No community cards dealt yet")
+		return
+	}
+
+	fmt.Print("Community cards: ")
 	for _, c := range communityCards {
 		fmt.Printf("%s ", c.String())
 	}
 	fmt.Println()
-}
-
-func evaluateHands(game *holdem.HoldemGame, playerHands map[string][]card.Card) {
-	// Get the community cards from the game's data
-	communityCardsData, ok := game.Data()["community_cards"]
-	if !ok {
-		fmt.Println("No community cards available")
-		return
-	}
-
-	communityCards, ok := communityCardsData.([]card.Card)
-	if !ok {
-		fmt.Println("Invalid community cards data")
-		return
-	}
-
-	// Evaluate each player's hand
-	results := make(map[string]pokerhand.HandResult)
-	for playerID, cards := range playerHands {
-		// Combine player cards and community cards
-		allCards := append(cards, communityCards...)
-
-		// Evaluate the hand
-		result := pokerhand.EvaluateHand(allCards)
-		results[playerID] = result
-
-		// Print the result
-		player := findPlayer(game, playerID)
-		fmt.Printf("%s: %s\n", player.Name(), result.Description)
-	}
-
-	// Determine the winner
-	determineWinner(game, results)
 }
 
 func findPlayer(game *holdem.HoldemGame, playerID string) player.Player {
@@ -288,21 +410,4 @@ func findPlayer(game *holdem.HoldemGame, playerID string) player.Player {
 		}
 	}
 	return nil
-}
-
-func determineWinner(game *holdem.HoldemGame, results map[string]pokerhand.HandResult) {
-	// Find the player with the best hand
-	var bestPlayerID string
-	var bestResult pokerhand.HandResult
-
-	for playerID, result := range results {
-		if bestPlayerID == "" || pokerhand.CompareHands(result, bestResult) > 0 {
-			bestPlayerID = playerID
-			bestResult = result
-		}
-	}
-
-	// Print the winner
-	winner := findPlayer(game, bestPlayerID)
-	fmt.Printf("\nWinner: %s with %s\n", winner.Name(), bestResult.Description)
 }

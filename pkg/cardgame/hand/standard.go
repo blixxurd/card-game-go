@@ -32,6 +32,10 @@ func (h *StandardHand) AddCard(c card.Card) error {
 
 // AddCards adds multiple cards to the hand
 func (h *StandardHand) AddCards(cards []card.Card) error {
+	if cards == nil {
+		return errors.New("cannot add nil cards to hand")
+	}
+
 	for _, c := range cards {
 		if err := h.AddCard(c); err != nil {
 			return err

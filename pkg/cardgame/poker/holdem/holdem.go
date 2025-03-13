@@ -100,6 +100,7 @@ type HoldemGame struct {
 	mainDeck         deck.Deck
 	communityCards   []card.Card
 	playerHands      map[string]hand.Hand
+	activePlayers    map[string]bool // Track which players are still in the hand
 	smallBlind       int
 	bigBlind         int
 	pot              int
@@ -119,6 +120,7 @@ func NewHoldemGame(id, name string, smallBlind, bigBlind int) *HoldemGame {
 		mainDeck:         deck.NewStandardDeck(),
 		communityCards:   make([]card.Card, 0),
 		playerHands:      make(map[string]hand.Hand),
+		activePlayers:    make(map[string]bool),
 		smallBlind:       smallBlind,
 		bigBlind:         bigBlind,
 		pot:              0,
@@ -168,6 +170,12 @@ func (g *HoldemGame) Start() error {
 
 	if len(g.players) < 2 {
 		return errors.New("not enough players")
+	}
+
+	// Initialize all players as active
+	g.activePlayers = make(map[string]bool)
+	for _, p := range g.players {
+		g.activePlayers[p.ID()] = true
 	}
 
 	// Deal hole cards to each player
@@ -250,18 +258,23 @@ func (g *HoldemGame) NextTurn() error {
 	// Move to the next player
 	g.currentPlayerIdx = (g.currentPlayerIdx + 1) % len(g.players)
 
+	// Skip players who have folded
+	for !g.activePlayers[g.players[g.currentPlayerIdx].ID()] && g.state != StateComplete {
+		g.currentPlayerIdx = (g.currentPlayerIdx + 1) % len(g.players)
+	}
+
 	// Check if we've completed a round (all players have acted)
 	if g.currentPlayerIdx == 0 {
 		// Advance the game state
 		switch g.state {
 		case StatePreFlop:
-			g.dealFlop()
+			g.DealFlop()
 			g.state = StateFlop
 		case StateFlop:
-			g.dealTurn()
+			g.DealTurn()
 			g.state = StateTurn
 		case StateTurn:
-			g.dealRiver()
+			g.DealRiver()
 			g.state = StateRiver
 		case StateRiver:
 			g.evaluateHands()
@@ -321,7 +334,33 @@ func (g *HoldemGame) ProcessAction(action game.Action) error {
 	case ActionRaise:
 		g.pot += holdemAction.amount
 	case ActionFold:
-		// Handle fold logic
+		// Mark the player as inactive
+		g.activePlayers[holdemAction.playerID] = false
+
+		// Check if there's only one active player left
+		activeCount := 0
+		var lastActivePlayer player.Player
+
+		for _, p := range g.players {
+			if g.activePlayers[p.ID()] {
+				activeCount++
+				lastActivePlayer = p
+			}
+		}
+
+		// If only one player remains, they win automatically
+		if activeCount == 1 {
+			g.winners = []player.Player{lastActivePlayer}
+			g.state = StateComplete
+			return nil
+		}
+
+		// If no players remain, end the game with no winner
+		if activeCount == 0 {
+			g.winners = []player.Player{}
+			g.state = StateComplete
+			return nil
+		}
 	default:
 		return errors.New("invalid action type")
 	}
@@ -329,18 +368,23 @@ func (g *HoldemGame) ProcessAction(action game.Action) error {
 	// Move to the next player
 	g.currentPlayerIdx = (g.currentPlayerIdx + 1) % len(g.players)
 
+	// Skip players who have folded
+	for !g.activePlayers[g.players[g.currentPlayerIdx].ID()] && g.state != StateComplete {
+		g.currentPlayerIdx = (g.currentPlayerIdx + 1) % len(g.players)
+	}
+
 	// Check if we've completed a round (all players have acted)
 	if g.currentPlayerIdx == 0 {
 		// Advance the game state
 		switch g.state {
 		case StatePreFlop:
-			g.dealFlop()
+			g.DealFlop()
 			g.state = StateFlop
 		case StateFlop:
-			g.dealTurn()
+			g.DealTurn()
 			g.state = StateTurn
 		case StateTurn:
-			g.dealRiver()
+			g.DealRiver()
 			g.state = StateRiver
 		case StateRiver:
 			g.evaluateHands()
@@ -429,6 +473,7 @@ func (g *HoldemGame) Reset() error {
 	g.mainDeck = deck.NewStandardDeck()
 	g.communityCards = make([]card.Card, 0)
 	g.playerHands = make(map[string]hand.Hand)
+	g.activePlayers = make(map[string]bool)
 	g.pot = 0
 	g.winners = make([]player.Player, 0)
 
@@ -493,7 +538,7 @@ func (g *HoldemGame) dealHoleCards() {
 }
 
 // dealFlop deals the flop (three community cards)
-func (g *HoldemGame) dealFlop() {
+func (g *HoldemGame) DealFlop() {
 	// Burn a card
 	_, _ = g.mainDeck.Draw()
 
@@ -512,7 +557,7 @@ func (g *HoldemGame) dealFlop() {
 }
 
 // dealTurn deals the turn (fourth community card)
-func (g *HoldemGame) dealTurn() {
+func (g *HoldemGame) DealTurn() {
 	// Burn a card
 	_, _ = g.mainDeck.Draw()
 
@@ -529,7 +574,7 @@ func (g *HoldemGame) dealTurn() {
 }
 
 // dealRiver deals the river (fifth community card)
-func (g *HoldemGame) dealRiver() {
+func (g *HoldemGame) DealRiver() {
 	// Burn a card
 	_, _ = g.mainDeck.Draw()
 
@@ -558,6 +603,11 @@ func (g *HoldemGame) evaluateHands() {
 	bestPlayers := make([]player.Player, 0)
 
 	for _, p := range g.players {
+		// Skip players who have folded
+		if !g.activePlayers[p.ID()] {
+			continue
+		}
+
 		playerHand := g.playerHands[p.ID()]
 		if playerHand == nil {
 			continue

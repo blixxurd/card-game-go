@@ -57,6 +57,10 @@ func (d *StandardPlayingDeck) Draw() (card.Card, error) {
 
 // DrawN removes and returns the top n cards from the deck
 func (d *StandardPlayingDeck) DrawN(n int) ([]card.Card, error) {
+	if n < 0 {
+		return nil, fmt.Errorf("cannot draw a negative number of cards: %d", n)
+	}
+
 	if len(d.cards) < n {
 		return nil, fmt.Errorf("not enough cards in the deck, requested %d but only have %d", n, len(d.cards))
 	}

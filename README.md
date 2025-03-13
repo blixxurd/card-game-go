@@ -126,3 +126,22 @@ The project includes an extensibility framework that allows for:
 
 ### Additional Features
 - **Hand History & Logging**: Detailed logging and replay of previous hands
+
+## Adding a New Game
+
+This guide demonstrates how to add a new poker variant or an entirely different card game to the framework.
+
+### Adding a New Poker Variant
+[Detailed Guide: Implementing a New Poker Variant](.docs/new-poker-variant.md)
+
+This guide walks you through implementing a new poker variant like Omaha, including creating the core game logic, implementing the variant interface, and adapting it to work with the extensibility framework.
+
+### Adding a Non-Poker Card Game
+[Detailed Guide: Implementing a Non-Poker Card Game](.docs/non-poker-card-game.md)
+
+Learn how to implement a traditional card game like Blackjack that uses standard playing cards but has different rules and mechanics from poker games.
+
+### Adding a Non-Traditional Card Game
+[Detailed Guide: Implementing a Non-Traditional Card Game](.docs/non-traditional-card-game.md)
+
+This guide demonstrates how to implement games with non-standard cards like Uno, showing how to create custom card types and game-specific rules while still leveraging the framework's architecture.

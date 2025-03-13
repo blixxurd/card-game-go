@@ -6,9 +6,11 @@ This project implements a flexible and composable card game framework with a pri
 
 - Robust deck and hand management
 - Comprehensive poker hand evaluation
-- Texas Hold'em game simulation
-- Basics of a WebSocket module intentded for future online play
-- Flexible architecture for easy extension to other card games
+- Texas Hold'em game simulation with side pot handling
+- Extensible architecture for different poker variants
+- Flexible betting structures (No Limit, Pot Limit, Fixed Limit)
+- Clean separation of concerns with well-defined interfaces
+- Adapter pattern for integrating existing implementations with new interfaces
 
 ## Project Goals
 
@@ -16,14 +18,21 @@ This project implements a flexible and composable card game framework with a pri
 2. Explore architecture patterns for card game development
 3. Experiment with casino-style games and games of chance in a software engineering context
 4. Provide a foundation for potential online multiplayer card games
+5. Showcase clean architecture principles and design patterns in Go
 
 ## Structure
 
 - `cmd/main.go`: Main application demonstrating the use of the framework (Currently runs a holdem simulation)
-- `internal/cardgame/`: Package containing core card game logic (cards, decks, game management)
-- `internal/pokerhand/`: Package for poker hand evaluation
-- `internal/games/`: Package for specific game implementations (currently Texas Hold'em)
-- `internal/net/`: Package for networking capabilities (WebSocket implementation)
+- `pkg/cardgame/`: Package containing core card game interfaces and implementations
+  - `card/`: Card interfaces and implementations
+  - `deck/`: Deck interfaces and implementations
+  - `hand/`: Hand interfaces and implementations
+  - `player/`: Player interfaces and implementations
+  - `game/`: Base game interfaces and types
+  - `table/`: Table management for poker games
+  - `poker/`: Poker-specific interfaces and factory
+    - `pokerhand/`: Poker hand evaluation
+    - `holdem/`: Texas Hold'em game implementation and adapter
 
 ## Usage
 
@@ -52,12 +61,87 @@ To run this project, follow these steps:
 - Card and deck management with shuffling and drawing capabilities
 - Hand dealing and verification
 - Poker hand evaluation (including games with community cards)
-- Texas Hold'em game simulation
-- WebSocket infrastructure for potential online play
+- Texas Hold'em game simulation with proper side pot handling
+- Extensibility framework for different poker variants
+- Factory pattern for creating different types of poker games
+- Well-defined interfaces for extending to other card games
+
+## Architecture
+
+The project follows a clean architecture approach with:
+
+- Clear separation between interfaces and implementations
+- Domain-driven design principles
+- Composition over inheritance
+- Dependency injection for flexible component wiring
+- Adapter pattern for integrating existing implementations with new interfaces
+- Factory pattern for creating different game variants
+
+### Extensibility Framework
+
+The project includes an extensibility framework that allows for:
+
+1. **Different Poker Variants**: The `PokerVariant` interface defines the contract for implementing different poker variants like Texas Hold'em, Omaha, Seven-Card Stud, etc.
+
+2. **Poker Game Factory**: The `PokerGameFactory` provides a way to register and create different poker variants.
+
+3. **Adapter Pattern**: The `HoldemGameAdapter` adapts the existing `HoldemGame` implementation to the new `PokerGame` interface, allowing for backward compatibility.
+
+4. **Betting Structures**: Support for different betting structures (No Limit, Pot Limit, Fixed Limit) through the `table` package.
+
+5. **Game State Management**: Well-defined game states and transitions for different poker variants.
 
 ## Future Directions
 
-- Implement additional poker variants (e.g., Omaha, Seven-Card Stud)
-- Expand to other card games (e.g., Blackjack, Bridge)
-- Develop a full-fledged online multiplayer system
-- Create a CLI or GUI for interactive gameplay
+### Additional Poker Variants
+- **Omaha**: Implement Omaha Hold'em with four hole cards per player and rules for using exactly two hole cards
+- **Seven-Card Stud**: Add support for stud poker games with no community cards
+- **Five-Card Draw**: Implement classic draw poker with card replacement
+
+### Expanded Game Types
+- **Blackjack**: Implement dealer logic, splitting, doubling down, and insurance
+
+### Online Multiplayer System
+- **WebSocket Server**: Real-time communication for live gameplay
+- **Integration with Player Accounts**: Leveraging the ID from a third party account service
+- **Game Rooms**: Lobby system for creating and joining games
+- **Spectator Mode**: Allow users to watch ongoing games
+
+### User Interface Options
+- **Command-Line Interface**: Text-based gameplay for quick testing
+- **Websocket Interface**: Responsive websocket interface to play with before adding a UI
+- 
+
+### AI Players
+- **Basic Strategy AI**: Rule-based AI for simple decision making
+- **Statistical AI**: Decision making based on pot odds and expected value
+- **Personality-Based AI**: Different AI styles (tight-aggressive, loose-passive, etc.)
+- **Machine Learning Integration**: Train models on gameplay data for advanced AI
+- **Difficulty Levels**: Configurable AI strength for appropriate challenge
+
+### Performance Optimizations
+- **Benchmarking**: Identify and address performance bottlenecks
+- **Concurrency Improvements**: Better utilization of Go's concurrency features
+- **Memory Optimization**: Reduce memory footprint for large-scale deployments
+
+### Additional Features
+- **Hand History & Logging**: Detailed logging and replay of previous hands
+
+## Adding a New Game
+
+This guide demonstrates how to add a new poker variant or an entirely different card game to the framework.
+
+### Adding a New Poker Variant
+[Detailed Guide: Implementing a New Poker Variant](.docs/new-poker-variant.md)
+
+This guide walks you through implementing a new poker variant like Omaha, including creating the core game logic, implementing the variant interface, and adapting it to work with the extensibility framework.
+
+### Adding a Non-Poker Card Game
+[Detailed Guide: Implementing a Non-Poker Card Game](.docs/non-poker-card-game.md)
+
+Learn how to implement a traditional card game like Blackjack that uses standard playing cards but has different rules and mechanics from poker games.
+
+### Adding a Non-Traditional Card Game
+[Detailed Guide: Implementing a Non-Traditional Card Game](.docs/non-traditional-card-game.md)
+
+This guide demonstrates how to implement games with non-standard cards like Uno, showing how to create custom card types and game-specific rules while still leveraging the framework's architecture.
